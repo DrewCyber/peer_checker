@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"os"
 	"regexp"
@@ -106,14 +106,14 @@ func resolve(name string) (string, error) {
 func isUp(peer *Peer) {
 	addr, err := resolve(peer.host)
 	if err != nil {
-		log.Printf("Resolve error %T: %s", err, err)
+		slog.Debug("Resolve error:", "msg", err, "type", fmt.Sprintf("%T", err))
 		return
 	}
 
 	startTime := time.Now()
 	conn, err := net.DialTimeout("tcp", "["+addr+"]:"+strconv.Itoa(peer.port), 5*time.Second)
 	if err != nil {
-		log.Printf("Connection error %T: %s", err, err)
+		slog.Debug("Connection error:", "msg", err, "type", fmt.Sprintf("%T", err))
 		return
 	}
 	defer conn.Close()
@@ -124,6 +124,7 @@ func isUp(peer *Peer) {
 
 func printResults(results []Peer) {
 	fmt.Println("Dead peers:")
+	fmt.Println("URI\tLocation")
 	for _, p := range results {
 		if !p.Up {
 			fmt.Printf("%s\t%s/%s\n", p.URI, p.Region, p.Country)
