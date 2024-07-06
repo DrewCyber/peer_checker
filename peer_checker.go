@@ -98,12 +98,12 @@ func getPeers(dataDir string, regions []string, countries []string) ([]Peer, err
 	return peers, nil
 }
 
-func resolve(name string) (string, error) {
+func resolve(name string, resolver func(string) ([]net.IP, error)) (string, error) {
 	if strings.HasPrefix(name, "[") {
 		return name[1 : len(name)-1], nil
 	}
 
-	ips, err := net.LookupIP(name)
+	ips, err := resolver(name)
 	if err != nil {
 		return "", err
 	}
@@ -111,7 +111,7 @@ func resolve(name string) (string, error) {
 }
 
 func isUp(peer *Peer) {
-	addr, err := resolve(peer.host)
+	addr, err := resolve(peer.host, net.LookupIP)
 	if err != nil {
 		slog.Debug("Resolve error:", "msg", err, "type", fmt.Sprintf("%T", err))
 		return
