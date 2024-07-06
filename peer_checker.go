@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"text/tabwriter"
 	"time"
 
 	"github.com/quic-go/quic-go"
@@ -147,15 +148,18 @@ func isUp(peer *Peer) {
 
 func printResults(results []Peer) {
 	fmt.Println("Dead peers:")
-	fmt.Println("URI\tLocation")
+	deadTable := tabwriter.NewWriter(os.Stdout, 1, 1, 1, ' ', 0)
+	fmt.Fprintln(deadTable, "URI\tLocation")
 	for _, p := range results {
 		if !p.Up {
-			fmt.Printf("%s\t%s/%s\n", p.URI, p.Region, p.Country)
+			fmt.Fprintf(deadTable, "%s\t%s/%s\n", p.URI, p.Region, p.Country)
 		}
 	}
+	deadTable.Flush()
 
 	fmt.Println("\n\nAlive peers (sorted by latency):")
-	fmt.Println("URI\tLatency (ms)\tLocation")
+	aliveTable := tabwriter.NewWriter(os.Stdout, 1, 1, 1, ' ', 0)
+	fmt.Fprintln(aliveTable, "URI\tLatency (ms)\tLocation")
 	alivePeers := []Peer{}
 	for _, p := range results {
 		if p.Up {
@@ -167,8 +171,9 @@ func printResults(results []Peer) {
 	})
 	for _, p := range alivePeers {
 		latency := p.Latency.Seconds() * 1000
-		fmt.Printf("%s\t%.3f\t%s/%s\n", p.URI, latency, p.Region, p.Country)
+		fmt.Fprintf(aliveTable, "%s\t%.3f\t%s/%s\n", p.URI, latency, p.Region, p.Country)
 	}
+	aliveTable.Flush()
 }
 
 func main() {
