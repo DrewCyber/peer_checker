@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"crypto/tls"
 	"fmt"
 	"log/slog"
 	"net"
@@ -11,11 +13,15 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/quic-go/quic-go"
 )
 
 var (
-	PEER_REGEX = regexp.MustCompile(`(tcp|tls)://([a-z0-9\.\-\:\[\]]+):([0-9]+)`)
+	PEER_REGEX = regexp.MustCompile(`(tcp|tls|quic)://([a-z0-9\.\-\:\[\]]+):([0-9]+)`)
 )
+
+const connTimeout = 5 * time.Second
 
 type Peer struct {
 	URI      string
@@ -110,16 +116,33 @@ func isUp(peer *Peer) {
 		return
 	}
 
-	startTime := time.Now()
-	conn, err := net.DialTimeout("tcp", "["+addr+"]:"+strconv.Itoa(peer.port), 5*time.Second)
-	if err != nil {
-		slog.Debug("Connection error:", "msg", err, "type", fmt.Sprintf("%T", err))
-		return
-	}
-	defer conn.Close()
+	switch peer.protocol {
+	case "tcp", "tls":
+		startTime := time.Now()
+		// Dial the TCP/TLS server
+		conn, err := net.DialTimeout("tcp", "["+addr+"]:"+strconv.Itoa(peer.port), connTimeout)
+		if err != nil {
+			slog.Debug("Connection error:", "msg", err, "type", fmt.Sprintf("%T", err))
+			return
+		}
+		defer conn.Close()
+		peer.Latency = time.Since(startTime)
+		peer.Up = true
+	case "quic":
+		// Create a context
+		ctx := context.Background()
 
-	peer.Latency = time.Since(startTime)
-	peer.Up = true
+		// Dial the QUIC server
+		startTime := time.Now()
+		conn, err := quic.DialAddr(ctx, "["+addr+"]:"+strconv.Itoa(peer.port), &tls.Config{InsecureSkipVerify: true}, nil)
+		if err != nil {
+			slog.Debug("Connection error:", "msg", err, "type", fmt.Sprintf("%T", err))
+			return
+		}
+		defer conn.CloseWithError(0, "Closing connection")
+		peer.Latency = time.Since(startTime)
+		peer.Up = true
+	}
 }
 
 func printResults(results []Peer) {
